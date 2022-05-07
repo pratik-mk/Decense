@@ -4,10 +4,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum DecenseError {
     #[error("Invalid Intruction")]
-    InvalidInstruction,
-
-    #[error("Invalid Number")]
-    InvalidNumber
+    InvalidInstruction
 }
 
 impl From<DecenseError> for ProgramError {
