@@ -1,4 +1,6 @@
-use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
+use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey, msg};
+
+use crate::instruction::DecenseInstruction;
 
 pub struct Processor;
 
@@ -8,6 +10,17 @@ impl Processor {
         accounts: &[AccountInfo],
         instruction_data: &[u8],
     ) -> ProgramResult {
+        match DecenseInstruction::unpack_instruction(instruction_data)? {
+            DecenseInstruction::Initialize { market_valuation } => {
+                msg!("Instruction: Initialize");
+                Self::process_initialize(program_id, accounts, market_valuation)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo], number: u64) -> ProgramResult {
         Ok(())
     }
 }
