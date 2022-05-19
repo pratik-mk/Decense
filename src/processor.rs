@@ -1,4 +1,13 @@
-use solana_program::{account_info::{AccountInfo, next_account_info}, entrypoint::ProgramResult, pubkey::Pubkey, msg, system_instruction, sysvar::{rent::Rent}, program_pack::Pack, program::invoke};
+use solana_program::{
+    account_info::{next_account_info, AccountInfo},
+    entrypoint::ProgramResult,
+    msg,
+    program::invoke,
+    program_pack::Pack,
+    pubkey::Pubkey,
+    system_instruction,
+    sysvar::rent::Rent,
+};
 
 use crate::instruction::DecenseInstruction;
 use crate::state::PlatformState;
@@ -39,13 +48,13 @@ impl Processor {
 
         if platform_state_account.data_is_empty() {
             let create_platform_state_account_ix = system_instruction::create_account_with_seed(
-                admin_account.key, 
-                platform_state_account.key, 
-                admin_account.key, 
-                "DECENSE PLATFORM", 
-                Rent::default().minimum_balance(PlatformState::LEN), 
-                PlatformState::LEN as u64, 
-                program_id
+                admin_account.key,
+                platform_state_account.key,
+                admin_account.key,
+                "DECENSE PLATFORM",
+                Rent::default().minimum_balance(PlatformState::LEN),
+                PlatformState::LEN as u64,
+                program_id,
             );
 
             invoke(
@@ -58,20 +67,25 @@ impl Processor {
             )?;
         }
 
-        let mut unpacked_platform_state_account = PlatformState::unpack_unchecked(&platform_state_account.try_borrow_data()?)?;
+        let mut unpacked_platform_state_account =
+            PlatformState::unpack_unchecked(&platform_state_account.try_borrow_data()?)?;
 
         unpacked_platform_state_account.is_initialized = true;
         unpacked_platform_state_account.platform_treasury_sol_wallet = *sol_treasury_wallet.key;
 
         PlatformState::pack(
-            unpacked_platform_state_account, 
-            &mut platform_state_account.try_borrow_mut_data()?
+            unpacked_platform_state_account,
+            &mut platform_state_account.try_borrow_mut_data()?,
         )?;
-        
+
         Ok(())
     }
 
-    fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo], number: u64) -> ProgramResult {
+    fn process_initialize(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        number: u64,
+    ) -> ProgramResult {
         Ok(())
     }
 }
