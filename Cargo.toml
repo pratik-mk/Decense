@@ -12,3 +12,6 @@ no-entrypoint = []
 solana-program = "1.10.12"
 spl-token = { version = "3.3.0", features = ["no-entrypoint"] }
 thiserror = "1.0.31"
+
+[lib]
+crate-type = ["lib", "cdylib"]
