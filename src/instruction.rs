@@ -3,6 +3,7 @@ use solana_program::program_error::ProgramError;
 use crate::error::DecenseError;
 
 pub enum DecenseInstruction {
+    InitializePlatform,
     Initialize { market_valuation: u64 },
 }
 
@@ -21,7 +22,8 @@ impl DecenseInstruction {
         let (ins_no, rest) = instruction_data.split_first().ok_or(DecenseError::InvalidInstruction)?;
         Ok(
             match ins_no {
-                0 => Self::Initialize {
+                0 => Self::InitializePlatform,
+                1 => Self::Initialize {
                     market_valuation: Self::get_number(rest)?
                 },
                 _ => return Err(DecenseError::InvalidInstruction.into())
