@@ -10,7 +10,7 @@ use solana_program::{
 };
 
 use crate::instruction::DecenseInstruction;
-use crate::state::PlatformState;
+use crate::state::{PlatformState, UserState};
 
 pub struct Processor;
 
@@ -28,7 +28,7 @@ impl Processor {
 
             DecenseInstruction::InitializeUser { market_valuation } => {
                 msg!("Instruction: InitializeUser");
-                Self::process_initialize(program_id, accounts, market_valuation)?;
+                Self::process_initialize_user(program_id, accounts, market_valuation)?;
             }
         }
 
@@ -81,11 +81,43 @@ impl Processor {
         Ok(())
     }
 
-    fn process_initialize(
+    fn process_initialize_user(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
         number: u64,
     ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+
+        let user_account = next_account_info(account_info_iter)?;
+
+        let user_state_account = next_account_info(account_info_iter)?;
+
+        let platform_state_account = next_account_info(account_info_iter)?;
+
+        let pda_account = next_account_info(account_info_iter)?;
+
+        let user_ata = next_account_info(account_info_iter)?;
+
+        let pda_ata = next_account_info(account_info_iter)?;
+
+        let token_program_account = next_account_info(account_info_iter)?;
+
+        let rent_sysvar_account = next_account_info(account_info_iter)?;
+
+        let associated_token_account_program_account = next_account_info(account_info_iter)?;
+
+        let system_program_account = next_account_info(account_info_iter)?;
+
+        let create_user_state_account_ix = system_instruction::create_account_with_seed(
+            user_account.key, 
+            user_state_account.key, 
+            user_account.key, 
+            "DECENSE USER", 
+            Rent::default().minimum_balance(UserState::LEN), 
+            UserState::LEN as u64, 
+            program_id
+        );
+
         Ok(())
     }
 }
