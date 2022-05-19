@@ -7,7 +7,7 @@ pub enum DecenseError {
     InvalidInstruction,
 
     #[error("Invalid Number")]
-    InvalidNumber
+    InvalidNumber,
 }
 
 impl From<DecenseError> for ProgramError {
