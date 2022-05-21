@@ -79,14 +79,14 @@ impl Pack for UserState {
         let src = array_ref![src, 0, UserState::LEN];
 
         let (
-            is_initialized, 
+            is_initialized,
             user,
             market_valuation,
             user_token_mint,
             user_ata,
             user_treasury_percentage,
             liquidate_percentage,
-            pda_ata
+            pda_ata,
         ) = array_refs![src, 1, 32, 8, 32, 32, 1, 1, 32];
 
         let is_initialized = match is_initialized {
@@ -103,7 +103,7 @@ impl Pack for UserState {
             user_ata: Pubkey::new_from_array(*user_ata),
             user_treasury_percentage: user_treasury_percentage[0],
             liquidate_percentage: liquidate_percentage[0],
-            pda_ata: Pubkey::new_from_array(*pda_ata)
+            pda_ata: Pubkey::new_from_array(*pda_ata),
         })
     }
 
@@ -111,25 +111,25 @@ impl Pack for UserState {
         let dst = array_mut_ref![dst, 0, UserState::LEN];
 
         let (
-            is_initialized_dst, 
+            is_initialized_dst,
             user_dst,
             market_valuation_dst,
             user_token_mint_dst,
             user_ata_dst,
             user_treasury_percentage_dst,
             liquidate_percentage_dst,
-            pda_ata_dst
+            pda_ata_dst,
         ) = mut_array_refs![dst, 1, 32, 8, 32, 32, 1, 1, 32];
 
         let UserState {
-            is_initialized, 
+            is_initialized,
             user,
             market_valuation,
             user_token_mint,
             user_ata,
             user_treasury_percentage,
             liquidate_percentage,
-            pda_ata
+            pda_ata,
         } = self;
 
         is_initialized_dst[0] = *is_initialized as u8;
