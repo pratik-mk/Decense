@@ -161,12 +161,11 @@ impl Pack for UserState {
     }
 }
 
-
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct BuyerState {
     pub is_initialized: bool,
     pub buyer: Pubkey,
-    pub current_holding_in_tokens: u64
+    pub current_holding_in_tokens: u64,
 }
 
 impl Sealed for BuyerState {}
@@ -182,11 +181,7 @@ impl Pack for BuyerState {
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         let src = array_ref![src, 0, BuyerState::LEN];
 
-        let (
-            is_initialized,
-            buyer,
-            current_holding_in_tokens
-        ) = array_refs![src, 1, 32, 8];
+        let (is_initialized, buyer, current_holding_in_tokens) = array_refs![src, 1, 32, 8];
 
         let is_initialized = match is_initialized {
             [0] => false,
@@ -197,23 +192,20 @@ impl Pack for BuyerState {
         Ok(BuyerState {
             is_initialized,
             buyer: Pubkey::new_from_array(*buyer),
-            current_holding_in_tokens: u64::from_le_bytes(*current_holding_in_tokens)
+            current_holding_in_tokens: u64::from_le_bytes(*current_holding_in_tokens),
         })
     }
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let dst = array_mut_ref![dst, 0, BuyerState::LEN];
 
-        let (
-            is_initialized_dst,
-            buyer_dst,
-            current_holding_in_tokens_dst
-        ) = mut_array_refs![dst, 1, 32, 8];
+        let (is_initialized_dst, buyer_dst, current_holding_in_tokens_dst) =
+            mut_array_refs![dst, 1, 32, 8];
 
         let BuyerState {
             is_initialized,
             buyer,
-            current_holding_in_tokens
+            current_holding_in_tokens,
         } = self;
 
         is_initialized_dst[0] = *is_initialized as u8;
