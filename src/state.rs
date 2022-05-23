@@ -92,7 +92,7 @@ impl Pack for UserState {
             liquidate_percentage,
             pda_ata,
             cmp,
-            holders
+            holders,
         ) = array_refs![src, 1, 32, 8, 8, 32, 32, 1, 1, 32, 8, 8];
 
         let is_initialized = match is_initialized {
@@ -112,7 +112,7 @@ impl Pack for UserState {
             liquidate_percentage: liquidate_percentage[0],
             pda_ata: Pubkey::new_from_array(*pda_ata),
             cmp: u64::from_le_bytes(*cmp),
-            holders: u64::from_le_bytes(*holders)
+            holders: u64::from_le_bytes(*holders),
         })
     }
 
@@ -130,7 +130,7 @@ impl Pack for UserState {
             liquidate_percentage_dst,
             pda_ata_dst,
             cmp_dst,
-            holders_dst
+            holders_dst,
         ) = mut_array_refs![dst, 1, 32, 8, 8, 32, 32, 1, 1, 32, 8, 8];
 
         let UserState {
@@ -144,7 +144,7 @@ impl Pack for UserState {
             liquidate_percentage,
             pda_ata,
             cmp,
-            holders
+            holders,
         } = self;
 
         is_initialized_dst[0] = *is_initialized as u8;
@@ -158,5 +158,58 @@ impl Pack for UserState {
         pda_ata_dst.copy_from_slice(pda_ata.as_ref());
         *cmp_dst = cmp.to_le_bytes();
         *holders_dst = holders.to_le_bytes();
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct BuyerState {
+    pub is_initialized: bool,
+    pub buyer: Pubkey,
+    pub current_holding_in_tokens: u64,
+}
+
+impl Sealed for BuyerState {}
+impl IsInitialized for BuyerState {
+    fn is_initialized(&self) -> bool {
+        self.is_initialized
+    }
+}
+
+impl Pack for BuyerState {
+    const LEN: usize = 41;
+
+    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
+        let src = array_ref![src, 0, BuyerState::LEN];
+
+        let (is_initialized, buyer, current_holding_in_tokens) = array_refs![src, 1, 32, 8];
+
+        let is_initialized = match is_initialized {
+            [0] => false,
+            [1] => true,
+            _ => return Err(ProgramError::InvalidAccountData),
+        };
+
+        Ok(BuyerState {
+            is_initialized,
+            buyer: Pubkey::new_from_array(*buyer),
+            current_holding_in_tokens: u64::from_le_bytes(*current_holding_in_tokens),
+        })
+    }
+
+    fn pack_into_slice(&self, dst: &mut [u8]) {
+        let dst = array_mut_ref![dst, 0, BuyerState::LEN];
+
+        let (is_initialized_dst, buyer_dst, current_holding_in_tokens_dst) =
+            mut_array_refs![dst, 1, 32, 8];
+
+        let BuyerState {
+            is_initialized,
+            buyer,
+            current_holding_in_tokens,
+        } = self;
+
+        is_initialized_dst[0] = *is_initialized as u8;
+        buyer_dst.copy_from_slice(buyer.as_ref());
+        *current_holding_in_tokens_dst = current_holding_in_tokens.to_le_bytes();
     }
 }

@@ -2,7 +2,7 @@ use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
     msg,
-    program::invoke,
+    program::{invoke, invoke_signed},
     program_error::ProgramError,
     program_pack::Pack,
     pubkey::Pubkey,
@@ -12,8 +12,8 @@ use solana_program::{
 
 use spl_associated_token_account::instruction::create_associated_token_account;
 
-use crate::instruction::DecenseInstruction;
 use crate::state::{PlatformState, UserState};
+use crate::{error::DecenseError, instruction::DecenseInstruction, state::BuyerState};
 
 pub struct Processor;
 
@@ -29,9 +29,20 @@ impl Processor {
                 Self::process_initialize_platform(program_id, accounts)?;
             }
 
-            DecenseInstruction::InitializeUser { market_valuation, supply } => {
+            DecenseInstruction::InitializeUser {
+                market_valuation,
+                supply,
+            } => {
                 msg!("Instruction: InitializeUser");
                 Self::process_initialize_user(program_id, accounts, market_valuation, supply)?;
+            }
+
+            DecenseInstruction::Exchange {
+                asked_price,
+                quantity,
+            } => {
+                msg!("Instruction: Exchange");
+                Self::process_exchange(program_id, accounts, asked_price, quantity)?;
             }
         }
 
@@ -88,7 +99,7 @@ impl Processor {
         program_id: &Pubkey,
         accounts: &[AccountInfo],
         market_valuation: u64,
-        supply: u64
+        supply: u64,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
@@ -271,11 +282,198 @@ impl Processor {
         unpacked_user_state_account.pda_ata = *pda_ata.key;
         unpacked_user_state_account.market_valuation = market_valuation;
         unpacked_user_state_account.supply = supply;
+        unpacked_user_state_account.cmp = market_valuation
+            .checked_div(supply)
+            .ok_or(DecenseError::MathError)?
+            .checked_mul(1000000000)
+            .ok_or(DecenseError::MathError)?;
         unpacked_user_state_account.liquidate_percentage = 50;
 
         UserState::pack(
             unpacked_user_state_account,
             &mut user_state_account.try_borrow_mut_data()?,
+        )?;
+
+        Ok(())
+    }
+
+    fn process_exchange(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        asked_price: u64,
+        quantity: u64,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+
+        let exchanger_account = next_account_info(account_info_iter)?;
+
+        let exchanger_state = next_account_info(account_info_iter)?;
+
+        let exchanger_token_ata = next_account_info(account_info_iter)?;
+
+        let sk_account = next_account_info(account_info_iter)?;
+
+        let sk_mint = next_account_info(account_info_iter)?;
+
+        let sk_state_account = next_account_info(account_info_iter)?;
+
+        let pda_account = next_account_info(account_info_iter)?;
+
+        let pda_token_ata = next_account_info(account_info_iter)?;
+
+        let token_program_account = next_account_info(account_info_iter)?;
+
+        let rent_sysvar_account = next_account_info(account_info_iter)?;
+
+        let associated_token_account_program_account = next_account_info(account_info_iter)?;
+
+        let system_program_account = next_account_info(account_info_iter)?;
+
+        let (pda, bump_seeds) =
+            Pubkey::find_program_address(&[sk_account.key.as_ref()], program_id);
+
+        if pda != *pda_account.key {
+            return Err(DecenseError::InvalidPDA.into());
+        }
+
+        if exchanger_state.data_is_empty() {
+            // create user state account
+            let create_user_state_account_ix = system_instruction::create_account_with_seed(
+                exchanger_account.key,
+                exchanger_state.key,
+                exchanger_account.key,
+                "DECENSE BUYER",
+                Rent::default().minimum_balance(BuyerState::LEN),
+                BuyerState::LEN as u64,
+                program_id,
+            );
+
+            invoke(
+                &create_user_state_account_ix,
+                &[
+                    exchanger_account.clone(),
+                    exchanger_state.clone(),
+                    system_program_account.clone(),
+                ],
+            )?;
+
+            let mut unpacked_exchanger_state =
+                BuyerState::unpack(&exchanger_state.try_borrow_data()?)?;
+
+            unpacked_exchanger_state.is_initialized = true;
+            unpacked_exchanger_state.buyer = *exchanger_account.key;
+
+            BuyerState::pack(
+                unpacked_exchanger_state,
+                &mut exchanger_account.try_borrow_mut_data()?,
+            )?;
+        }
+
+        if exchanger_token_ata.data_is_empty() {
+            // create exchanger ata for user
+            let create_exchanger_ata_ix = create_associated_token_account(
+                exchanger_account.key,
+                exchanger_account.key,
+                sk_mint.key,
+            );
+
+            invoke(
+                &create_exchanger_ata_ix,
+                &[
+                    exchanger_account.clone(),
+                    exchanger_token_ata.clone(),
+                    exchanger_account.clone(),
+                    sk_mint.clone(),
+                    system_program_account.clone(),
+                    token_program_account.clone(),
+                    rent_sysvar_account.clone(),
+                    associated_token_account_program_account.clone(),
+                ],
+            )?;
+        }
+
+        let mut unpacked_sk_state_account =
+            UserState::unpack(&sk_state_account.try_borrow_data()?)?;
+
+        let mut unpacked_exchanger_state = BuyerState::unpack(&exchanger_state.try_borrow_data()?)?;
+
+        let unpacked_pda_token_ata =
+            spl_token::state::Account::unpack(&pda_token_ata.try_borrow_data()?)?;
+
+        if quantity > unpacked_pda_token_ata.amount {
+            return Err(DecenseError::InsufficientTokenBalance.into());
+        }
+
+        let transfer_sol =
+            system_instruction::transfer(exchanger_account.key, sk_account.key, asked_price);
+
+        invoke(
+            &transfer_sol,
+            &[
+                exchanger_account.clone(),
+                sk_account.clone(),
+                system_program_account.clone(),
+            ],
+        )?;
+
+        let mut new_cmp = (asked_price.checked_sub(unpacked_sk_state_account.cmp))
+            .ok_or(DecenseError::MathError)?
+            .checked_div(unpacked_pda_token_ata.amount)
+            .ok_or(DecenseError::MathError)?
+            .checked_mul(quantity)
+            .ok_or(DecenseError::MathError)?;
+
+        if asked_price > unpacked_sk_state_account.cmp {
+            new_cmp = unpacked_sk_state_account
+                .cmp
+                .checked_add(new_cmp)
+                .ok_or(DecenseError::MathError)?;
+        } else {
+            new_cmp = unpacked_sk_state_account
+                .cmp
+                .checked_sub(new_cmp)
+                .ok_or(DecenseError::MathError)?;
+        }
+
+        let transfer_token_to_user = spl_token::instruction::transfer_checked(
+            &spl_token::id(),
+            pda_token_ata.key,
+            sk_mint.key,
+            exchanger_token_ata.key,
+            pda_account.key,
+            &[],
+            quantity,
+            4,
+        )?;
+
+        invoke_signed(
+            &transfer_token_to_user,
+            &[
+                pda_token_ata.clone(),
+                exchanger_token_ata.clone(),
+                pda_account.clone(),
+                token_program_account.clone(),
+            ],
+            &[&[sk_account.key.as_ref(), &[bump_seeds]]],
+        )?;
+
+        if unpacked_exchanger_state.current_holding_in_tokens == 0 {
+            unpacked_sk_state_account.holders = unpacked_sk_state_account
+                .holders
+                .checked_add(1)
+                .ok_or(DecenseError::MathError)?;
+        }
+
+        unpacked_sk_state_account.cmp = new_cmp;
+        UserState::pack(
+            unpacked_sk_state_account,
+            &mut sk_state_account.try_borrow_mut_data()?,
+        )?;
+
+        unpacked_exchanger_state.current_holding_in_tokens = quantity;
+        BuyerState::pack(
+            unpacked_exchanger_state,
+            &mut exchanger_state.try_borrow_mut_data()?,
         )?;
 
         Ok(())

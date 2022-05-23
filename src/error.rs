@@ -8,6 +8,15 @@ pub enum DecenseError {
 
     #[error("Invalid Number")]
     InvalidNumber,
+
+    #[error("Insufficient token balance")]
+    InsufficientTokenBalance,
+
+    #[error("Math Error")]
+    MathError,
+
+    #[error("Invalid PDA")]
+    InvalidPDA,
 }
 
 impl From<DecenseError> for ProgramError {
