@@ -29,9 +29,9 @@ impl Processor {
                 Self::process_initialize_platform(program_id, accounts)?;
             }
 
-            DecenseInstruction::InitializeUser { market_valuation } => {
+            DecenseInstruction::InitializeUser { market_valuation, supply } => {
                 msg!("Instruction: InitializeUser");
-                Self::process_initialize_user(program_id, accounts, market_valuation)?;
+                Self::process_initialize_user(program_id, accounts, market_valuation, supply)?;
             }
         }
 
@@ -87,7 +87,8 @@ impl Processor {
     fn process_initialize_user(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
-        number: u64,
+        market_valuation: u64,
+        supply: u64
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
@@ -222,7 +223,7 @@ impl Processor {
             user_ata.key,
             user_account.key,
             &[],
-            number * 10000,
+            supply * 10000,
             4,
         )?;
 
@@ -244,7 +245,7 @@ impl Processor {
             pda_ata.key,
             user_account.key,
             &[],
-            (number / 2) * 10000,
+            (supply / 2) * 10000,
             4,
         )?;
 
@@ -268,7 +269,8 @@ impl Processor {
         unpacked_user_state_account.user_ata = *user_ata.key;
         unpacked_user_state_account.user = *user_account.key;
         unpacked_user_state_account.pda_ata = *pda_ata.key;
-        unpacked_user_state_account.market_valuation = number;
+        unpacked_user_state_account.market_valuation = market_valuation;
+        unpacked_user_state_account.supply = supply;
         unpacked_user_state_account.liquidate_percentage = 50;
 
         UserState::pack(
