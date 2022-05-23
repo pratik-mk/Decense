@@ -92,7 +92,7 @@ impl Pack for UserState {
             liquidate_percentage,
             pda_ata,
             cmp,
-            holders
+            holders,
         ) = array_refs![src, 1, 32, 8, 8, 32, 32, 1, 1, 32, 8, 8];
 
         let is_initialized = match is_initialized {
@@ -112,7 +112,7 @@ impl Pack for UserState {
             liquidate_percentage: liquidate_percentage[0],
             pda_ata: Pubkey::new_from_array(*pda_ata),
             cmp: u64::from_le_bytes(*cmp),
-            holders: u64::from_le_bytes(*holders)
+            holders: u64::from_le_bytes(*holders),
         })
     }
 
@@ -130,7 +130,7 @@ impl Pack for UserState {
             liquidate_percentage_dst,
             pda_ata_dst,
             cmp_dst,
-            holders_dst
+            holders_dst,
         ) = mut_array_refs![dst, 1, 32, 8, 8, 32, 32, 1, 1, 32, 8, 8];
 
         let UserState {
@@ -144,7 +144,7 @@ impl Pack for UserState {
             liquidate_percentage,
             pda_ata,
             cmp,
-            holders
+            holders,
         } = self;
 
         is_initialized_dst[0] = *is_initialized as u8;

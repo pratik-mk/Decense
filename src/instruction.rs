@@ -5,10 +5,11 @@ use crate::error::DecenseError;
 pub enum DecenseInstruction {
     InitializePlatform,
     InitializeUser { market_valuation: u64, supply: u64 },
+    Exchange { asked_price: u64, quantity: u64 },
 }
 
 impl DecenseInstruction {
-    fn get_market_valuation(rest: &[u8]) -> Result<u64, ProgramError> {
+    fn get_first_u64(rest: &[u8]) -> Result<u64, ProgramError> {
         let amount = rest
             .get(..8)
             .and_then(|slice| slice.try_into().ok())
@@ -17,7 +18,7 @@ impl DecenseInstruction {
         Ok(amount)
     }
 
-    fn get_supply(rest: &[u8]) -> Result<u64, ProgramError> {
+    fn get_second_u64(rest: &[u8]) -> Result<u64, ProgramError> {
         let amount = rest
             .get(8..16)
             .and_then(|slice| slice.try_into().ok())
@@ -33,8 +34,12 @@ impl DecenseInstruction {
         Ok(match ins_no {
             0 => Self::InitializePlatform,
             1 => Self::InitializeUser {
-                market_valuation: Self::get_market_valuation(rest)?,
-                supply: Self::get_supply(rest)?
+                market_valuation: Self::get_first_u64(rest)?,
+                supply: Self::get_second_u64(rest)?,
+            },
+            2 => Self::Exchange {
+                asked_price: Self::get_first_u64(rest)?,
+                quantity: Self::get_second_u64(rest)?,
             },
             _ => return Err(DecenseError::InvalidInstruction.into()),
         })
