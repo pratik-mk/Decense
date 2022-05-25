@@ -580,10 +580,12 @@ impl Processor {
                 let mut unpacked_exchanger_state =
                     BuyerState::unpack(&exchanger_state.try_borrow_data()?)?;
 
-                unpacked_exchanger_state.current_holding_in_tokens = unpacked_exchanger_state
-                    .current_holding_in_tokens
-                    .checked_sub(amount)
-                    .ok_or(DecenseError::MathError)?;
+                if unpacked_exchanger_state.current_holding_in_tokens != 0 {
+                    unpacked_exchanger_state.current_holding_in_tokens = unpacked_exchanger_state
+                        .current_holding_in_tokens
+                        .checked_sub(amount)
+                        .ok_or(DecenseError::MathError)?;
+                }
 
                 BuyerState::pack(
                     unpacked_exchanger_state,
