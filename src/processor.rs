@@ -440,6 +440,15 @@ impl Processor {
                 .ok_or(DecenseError::MathError)?;
         }
 
+        let unpacked_exchanger_token_ata = spl_token::state::Account::unpack(&exchanger_token_ata.try_borrow_data()?)?;
+
+        if unpacked_exchanger_token_ata.amount == 0 {
+            unpacked_sk_state_account.holders = unpacked_sk_state_account
+                .holders
+                .checked_add(1)
+                .ok_or(DecenseError::MathError)?;
+        }
+
         let transfer_token_to_user = spl_token::instruction::transfer_checked(
             &spl_token::id(),
             pda_token_ata.key,
@@ -461,13 +470,6 @@ impl Processor {
             ],
             &[&[sk_account.key.as_ref(), &[bump_seeds]]],
         )?;
-
-        if unpacked_exchanger_state.current_holding_in_tokens == 0 {
-            unpacked_sk_state_account.holders = unpacked_sk_state_account
-                .holders
-                .checked_add(1)
-                .ok_or(DecenseError::MathError)?;
-        }
 
         unpacked_sk_state_account.cmp = new_cmp;
         UserState::pack(
@@ -547,6 +549,8 @@ impl Processor {
                         .holders
                         .checked_sub(1)
                         .ok_or(DecenseError::MathError)?;
+
+                    
 
                     UserState::pack(
                         unpacked_sk_state_account,
