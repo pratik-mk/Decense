@@ -440,7 +440,8 @@ impl Processor {
                 .ok_or(DecenseError::MathError)?;
         }
 
-        let unpacked_exchanger_token_ata = spl_token::state::Account::unpack(&exchanger_token_ata.try_borrow_data()?)?;
+        let unpacked_exchanger_token_ata =
+            spl_token::state::Account::unpack(&exchanger_token_ata.try_borrow_data()?)?;
 
         if unpacked_exchanger_token_ata.amount == 0 {
             unpacked_sk_state_account.holders = unpacked_sk_state_account
@@ -501,6 +502,8 @@ impl Processor {
 
         let exchanger_account = next_account_info(account_info_iter)?;
 
+        let exchanger_state = next_account_info(account_info_iter)?;
+
         let exchanger_token_ata = next_account_info(account_info_iter)?;
 
         let pda_account = next_account_info(account_info_iter)?;
@@ -508,6 +511,8 @@ impl Processor {
         let pda_token_ata = next_account_info(account_info_iter)?;
 
         let token_program_account = next_account_info(account_info_iter)?;
+
+        let system_program_account = next_account_info(account_info_iter)?;
 
         let (pda, bump_seeds) =
             Pubkey::find_program_address(&[sk_account.key.as_ref()], program_id);
@@ -539,6 +544,52 @@ impl Processor {
                     ],
                 )?;
 
+                if exchanger_state.data_is_empty() {
+                    // create user state account
+                    let create_user_state_account_ix = system_instruction::create_account_with_seed(
+                        exchanger_account.key,
+                        exchanger_state.key,
+                        exchanger_account.key,
+                        "DECENSE BUYER",
+                        Rent::default().minimum_balance(BuyerState::LEN),
+                        BuyerState::LEN as u64,
+                        program_id,
+                    );
+
+                    invoke(
+                        &create_user_state_account_ix,
+                        &[
+                            exchanger_account.clone(),
+                            exchanger_state.clone(),
+                            system_program_account.clone(),
+                        ],
+                    )?;
+
+                    let mut unpacked_exchanger_state =
+                        BuyerState::unpack(&exchanger_state.try_borrow_data()?)?;
+
+                    unpacked_exchanger_state.is_initialized = true;
+                    unpacked_exchanger_state.buyer = *exchanger_account.key;
+
+                    BuyerState::pack(
+                        unpacked_exchanger_state,
+                        &mut exchanger_account.try_borrow_mut_data()?,
+                    )?;
+                }
+
+                let mut unpacked_exchanger_state =
+                    BuyerState::unpack(&exchanger_state.try_borrow_data()?)?;
+
+                unpacked_exchanger_state.current_holding_in_tokens = unpacked_exchanger_state
+                    .current_holding_in_tokens
+                    .checked_sub(amount)
+                    .ok_or(DecenseError::MathError)?;
+
+                BuyerState::pack(
+                    unpacked_exchanger_state,
+                    &mut exchanger_account.try_borrow_mut_data()?,
+                )?;
+
                 let unpacked_exchanger_token_ata =
                     spl_token::state::Account::unpack(&exchanger_token_ata.try_borrow_data()?)?;
 
@@ -550,8 +601,6 @@ impl Processor {
                         .checked_sub(1)
                         .ok_or(DecenseError::MathError)?;
 
-                    
-
                     UserState::pack(
                         unpacked_sk_state_account,
                         &mut sk_state_account.try_borrow_mut_data()?,
@@ -560,6 +609,52 @@ impl Processor {
             }
 
             1 => {
+                if exchanger_state.data_is_empty() {
+                    // create user state account
+                    let create_user_state_account_ix = system_instruction::create_account_with_seed(
+                        exchanger_account.key,
+                        exchanger_state.key,
+                        exchanger_account.key,
+                        "DECENSE BUYER",
+                        Rent::default().minimum_balance(BuyerState::LEN),
+                        BuyerState::LEN as u64,
+                        program_id,
+                    );
+
+                    invoke(
+                        &create_user_state_account_ix,
+                        &[
+                            exchanger_account.clone(),
+                            exchanger_state.clone(),
+                            system_program_account.clone(),
+                        ],
+                    )?;
+
+                    let mut unpacked_exchanger_state =
+                        BuyerState::unpack(&exchanger_state.try_borrow_data()?)?;
+
+                    unpacked_exchanger_state.is_initialized = true;
+                    unpacked_exchanger_state.buyer = *exchanger_account.key;
+
+                    BuyerState::pack(
+                        unpacked_exchanger_state,
+                        &mut exchanger_account.try_borrow_mut_data()?,
+                    )?;
+                }
+
+                let mut unpacked_exchanger_state =
+                    BuyerState::unpack(&exchanger_state.try_borrow_data()?)?;
+
+                unpacked_exchanger_state.current_holding_in_tokens = unpacked_exchanger_state
+                    .current_holding_in_tokens
+                    .checked_add(amount)
+                    .ok_or(DecenseError::MathError)?;
+
+                BuyerState::pack(
+                    unpacked_exchanger_state,
+                    &mut exchanger_account.try_borrow_mut_data()?,
+                )?;
+
                 let unpacked_exchanger_token_ata =
                     spl_token::state::Account::unpack(&exchanger_token_ata.try_borrow_data()?)?;
 
