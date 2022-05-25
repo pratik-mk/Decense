@@ -6,6 +6,7 @@ pub enum DecenseInstruction {
     InitializePlatform,
     InitializeUser { market_valuation: u64, supply: u64 },
     Exchange { asked_price: u64, quantity: u64 },
+    SendRecieveToken { action: u64, amount: u64 },
 }
 
 impl DecenseInstruction {
@@ -40,6 +41,10 @@ impl DecenseInstruction {
             2 => Self::Exchange {
                 asked_price: Self::get_first_u64(rest)?,
                 quantity: Self::get_second_u64(rest)?,
+            },
+            3 => Self::SendRecieveToken {
+                action: Self::get_first_u64(rest)?,
+                amount: Self::get_second_u64(rest)?,
             },
             _ => return Err(DecenseError::InvalidInstruction.into()),
         })
