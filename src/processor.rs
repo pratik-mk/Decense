@@ -44,6 +44,11 @@ impl Processor {
                 msg!("Instruction: Exchange");
                 Self::process_exchange(program_id, accounts, asked_price, quantity)?;
             }
+
+            DecenseInstruction::SendRecieveToken { action, amount } => {
+                msg!("Instruction: SendRecieveToken");
+                Self::process_send_receive_tokens(program_id, accounts, action, amount)?;
+            }
         }
 
         Ok(())
@@ -475,6 +480,124 @@ impl Processor {
             unpacked_exchanger_state,
             &mut exchanger_state.try_borrow_mut_data()?,
         )?;
+
+        Ok(())
+    }
+    fn process_send_receive_tokens(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        action: u64,
+        amount: u64,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+
+        let sk_account = next_account_info(account_info_iter)?;
+
+        let sk_state_account = next_account_info(account_info_iter)?;
+
+        let sk_mint = next_account_info(account_info_iter)?;
+
+        let exchanger_account = next_account_info(account_info_iter)?;
+
+        let exchanger_token_ata = next_account_info(account_info_iter)?;
+
+        let pda_account = next_account_info(account_info_iter)?;
+
+        let pda_token_ata = next_account_info(account_info_iter)?;
+
+        let token_program_account = next_account_info(account_info_iter)?;
+
+        let (pda, bump_seeds) =
+            Pubkey::find_program_address(&[sk_account.key.as_ref()], program_id);
+
+        if *pda_account.key != pda {
+            return Err(DecenseError::InvalidPDA.into());
+        }
+
+        match action {
+            0 => {
+                let transfer_token_to_user = spl_token::instruction::transfer_checked(
+                    &spl_token::id(),
+                    exchanger_token_ata.key,
+                    sk_mint.key,
+                    pda_token_ata.key,
+                    exchanger_account.key,
+                    &[],
+                    amount,
+                    4,
+                )?;
+
+                invoke(
+                    &transfer_token_to_user,
+                    &[
+                        exchanger_token_ata.clone(),
+                        pda_token_ata.clone(),
+                        exchanger_account.clone(),
+                        token_program_account.clone(),
+                    ],
+                )?;
+
+                let unpacked_exchanger_token_ata =
+                    spl_token::state::Account::unpack(&exchanger_token_ata.try_borrow_data()?)?;
+
+                if unpacked_exchanger_token_ata.amount == 0 {
+                    let mut unpacked_sk_state_account =
+                        UserState::unpack(&sk_state_account.try_borrow_data()?)?;
+                    unpacked_sk_state_account.holders = unpacked_sk_state_account
+                        .holders
+                        .checked_sub(1)
+                        .ok_or(DecenseError::MathError)?;
+
+                    UserState::pack(
+                        unpacked_sk_state_account,
+                        &mut sk_state_account.try_borrow_mut_data()?,
+                    )?;
+                }
+            }
+
+            1 => {
+                let unpacked_exchanger_token_ata =
+                    spl_token::state::Account::unpack(&exchanger_token_ata.try_borrow_data()?)?;
+
+                if unpacked_exchanger_token_ata.amount == 0 {
+                    let mut unpacked_sk_state_account =
+                        UserState::unpack(&sk_state_account.try_borrow_data()?)?;
+                    unpacked_sk_state_account.holders = unpacked_sk_state_account
+                        .holders
+                        .checked_add(1)
+                        .ok_or(DecenseError::MathError)?;
+
+                    UserState::pack(
+                        unpacked_sk_state_account,
+                        &mut sk_state_account.try_borrow_mut_data()?,
+                    )?;
+                }
+
+                let transfer_token_to_user = spl_token::instruction::transfer_checked(
+                    &spl_token::id(),
+                    pda_token_ata.key,
+                    sk_mint.key,
+                    exchanger_token_ata.key,
+                    pda_account.key,
+                    &[],
+                    amount,
+                    4,
+                )?;
+
+                invoke_signed(
+                    &transfer_token_to_user,
+                    &[
+                        pda_token_ata.clone(),
+                        exchanger_token_ata.clone(),
+                        pda_account.clone(),
+                        token_program_account.clone(),
+                    ],
+                    &[&[sk_account.key.as_ref(), &[bump_seeds]]],
+                )?;
+            }
+
+            _ => return Err(DecenseError::InvalidInstruction.into()),
+        }
 
         Ok(())
     }
